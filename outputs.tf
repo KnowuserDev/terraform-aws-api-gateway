@@ -14,3 +14,7 @@ output "tags" {
   value       = module.labels.tags
   description = "A mapping of tags to assign to the resource."
 }
+
+output "endpoint" {
+  value = join(" ", aws_api_gateway_deployment.default.*.invoke_url)
+}
