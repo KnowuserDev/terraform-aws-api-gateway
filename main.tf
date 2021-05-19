@@ -107,7 +107,9 @@ resource "aws_api_gateway_method_response" "default" {
   http_method         = aws_api_gateway_method.default.*.http_method[count.index]
   status_code         = element(var.status_codes, count.index)
   response_models     = length(var.response_models) > 0 ? element(var.response_models, count.index) : {}
-  response_parameters = length(var.response_parameters) > 0 ? element(var.response_parameters, count.index) : {}
+  response_parameters = {
+    "method.response.header.Access-Control-Allow-Origin" = true
+  }
 }
 
 # Module      : Api Gateway Integration Response
@@ -119,8 +121,19 @@ resource "aws_api_gateway_integration_response" "default" {
   http_method = aws_api_gateway_method.default.*.http_method[count.index]
   status_code = aws_api_gateway_method_response.default.*.status_code[count.index]
 
-  response_parameters = length(var.integration_response_parameters) > 0 ? element(var.integration_response_parameters, count.index) : {}
-  response_templates  = length(var.response_templates) > 0 ? element(var.response_templates, count.index) : {}
+  response_parameters = {
+    "method.response.header.Access-Control-Allow-Origin" = "'*'"
+  }
+  # Transforms the backend JSON response to XML
+  response_templates = {
+    "application/xml" = <<EOF
+#set($inputRoot = $input.path('$'))
+<?xml version="1.0" encoding="UTF-8"?>
+<message>
+    $inputRoot.body
+</message>
+EOF
+  }
   content_handling    = length(var.response_content_handlings) > 0 ? element(var.response_content_handlings, count.index) : null
 }
 
@@ -158,7 +171,10 @@ resource "aws_api_gateway_integration" "options_integration" {
   http_method = aws_api_gateway_method.options_method.*.http_method[count.index]
 
   type             = "MOCK"
-  content_handling = "CONVERT_TO_TEXT"
+  
+  request_templates = {
+    "application/json" = "{ \"statusCode\": 200 }"
+  }
 
   depends_on = [aws_api_gateway_method.options_method]
 }
@@ -174,6 +190,10 @@ resource "aws_api_gateway_integration_response" "options_integration_response" {
     "method.response.header.Access-Control-Allow-Origin"  = "'*'"
     "method.response.header.Access-Control-Allow-Headers" = "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,X-Amz-User-Agent'"
     "method.response.header.Access-Control-Allow-Methods" = "'OPTIONS,DELETE,GET,HEAD,PATCH,POST,PUT'"
+  }
+
+  response_templates = {
+    "application/json" = "Empty"
   }
 
   depends_on = [
